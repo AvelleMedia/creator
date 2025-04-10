@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kreatörsbank – Avelle Media</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow">
+    <h1 class="text-2xl font-bold mb-2">UGC Kreatörsbank</h1>
+    <p id="statusMessage" class="text-sm mb-6 text-gray-600">⏳ Laddar kreatörsdata...</p>
+
+    <!-- Filtersektion -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <select id="genderFilter" class="border p-2 rounded">
+        <option value="">Filtrera på kön</option>
+      </select>
+      <select id="ageFilter" class="border p-2 rounded">
+        <option value="">Filtrera på ålder</option>
+        <option value="under 25">Under 25</option>
+        <option value="25-35">25-35</option>
+        <option value="över 35">Över 35</option>
+      </select>
+      <select id="contentFilter" class="border p-2 rounded">
+        <option value="">Filtrera på content-typ</option>
+      </select>
+    </div>
+
+    <!-- Tabell -->
+    <table class="min-w-full bg-white border">
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="border p-2">Namn</th>
+          <th class="border p-2">Instagram</th>
+          <th class="border p-2">Kön</th>
+          <th class="border p-2">Ålder</th>
+          <th class="border p-2">Content-typer</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+
+    <!-- Detaljvy -->
+    <div id="detailView" class="mt-8 p-4 bg-gray-50 border rounded hidden">
+      <h2 class="text-xl font-semibold mb-4">Detaljerad info</h2>
+      <div id="detailContent" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS1EY4K0ysQf2sTwLBy2jn28CTW6x6M8REzvX8PBphsn7tzdHjhYPfN3S_kYmAXwzoEM_iuzCCUWSBi/pub?gid=157980788&single=true&output=csv";
+    let data = [];
+
+    function loadSheet() {
+      fetch(SHEET_URL)
+        .then(response => response.text())
+        .then(csvText => {
+          Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+              data = results.data.map(row => ({
+                förnamn: row["First name"] || '',
+                efternamn: row["Last name"] || '',
+                email: row["Email"] || '',
+                kön: row["Ange ditt kön."] || '',
+                ålder: parseInt(row["Ålder"]) || 0,
+                instagram: row["Vad heter du på Instagram\\"] || '',
+                tiktok: row["Vad heter du på Tiktok\\"] || '',
+                content: row["🎥 Vilken typ av content tycker du allra mest om att skapa"] || '',
+                språk: row["Språk du talar flytande"] || '',
+                telefon: row["Vad är ditt telefonnummer\\"] || '',
+                selfie: row["📥 Ladda upp en selfie!"] || '',
+                hemsida: row["Har du en hemsida eller en portfölj\\"] || '',
+                video: row["Skicka en kort video/UGC video när du pratar"] || '',
+                dialekt: row["Har du någon dialekt"] || '',
+                city: row["City/Town"] || '',
+                address: row["Address"] || '',
+              }));
+
+              document.getElementById("statusMessage").textContent = "✔️ Data inläst från Google Sheet";
+              document.getElementById("statusMessage").classList.add("text-green-600");
+              populateFilters(data);
+              renderTable(data);
+            }
+          });
+        })
+        .catch(error => {
+          console.error("Fel vid hämtning:", error);
+          const msg = document.getElementById("statusMessage");
+          msg.textContent = "❌ Kunde inte hämta data från Google Sheet.";
+          msg.classList.add("text-red-600");
+        });
+    }
+
+    function populateFilters(data) {
+      const genderSet = new Set();
+      const contentSet = new Set();
+
+      data.forEach(row => {
+        if (row.kön) genderSet.add(row.kön.trim());
+        if (row.content) {
+          row.content.split(',').forEach(c => contentSet.add(c.trim()));
+        }
+      });
+
+      const genderFilter = document.getElementById("genderFilter");
+      genderSet.forEach(gender => {
+        const opt = document.createElement("option");
+        opt.value = gender;
+        opt.textContent = gender;
+        genderFilter.appendChild(opt);
+      });
+
+      const contentFilter = document.getElementById("contentFilter");
+      contentSet.forEach(content => {
+        const opt = document.createElement("option");
+        opt.value = content;
+        opt.textContent = content;
+        contentFilter.appendChild(opt);
+      });
+    }
+
+    function renderTable(filteredData) {
+      const tableBody = document.getElementById("tableBody");
+      tableBody.innerHTML = "";
+
+      filteredData.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.classList.add("cursor-pointer", "hover:bg-gray-100");
+        tr.innerHTML = `
+          <td class="border p-2">${row.förnamn} ${row.efternamn}</td>
+          <td class="border p-2">${row.instagram}</td>
+          <td class="border p-2">${row.kön}</td>
+          <td class="border p-2">${row.ålder}</td>
+          <td class="border p-2">${row.content}</td>
+        `;
+        tr.addEventListener("click", () => showDetails(row));
+        tableBody.appendChild(tr);
+      });
+    }
+
+    function filterData() {
+      const gender = document.getElementById("genderFilter").value;
+      const ageCat = document.getElementById("ageFilter").value;
+      const content = document.getElementById("contentFilter").value;
+
+      const filtered = data.filter(row => {
+        const matchGender = !gender || row.kön === gender;
+        const matchContent = !content || row.content.toLowerCase().includes(content.toLowerCase());
+        let matchAge = true;
+        if (ageCat === "under 25") matchAge = row.ålder < 25;
+        else if (ageCat === "25-35") matchAge = row.ålder >= 25 && row.ålder <= 35;
+        else if (ageCat === "över 35") matchAge = row.ålder > 35;
+        return matchGender && matchAge && matchContent;
+      });
+
+      renderTable(filtered);
+    }
+
+    function showDetails(row) {
+      const detail = document.getElementById("detailView");
+      const content = document.getElementById("detailContent");
+      detail.classList.remove("hidden");
+      content.innerHTML = "";
+
+      for (const [key, value] of Object.entries(row)) {
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${key}:</strong> ${value || '-'}`;
+        content.appendChild(div);
+      }
+    }
+
+    document.getElementById("genderFilter").addEventListener("change", filterData);
+    document.getElementById("ageFilter").addEventListener("change", filterData);
+    document.getElementById("contentFilter").addEventListener("change", filterData);
+
+    window.addEventListener("DOMContentLoaded", loadSheet);
+  </script>
+</body>
+</html>
+
